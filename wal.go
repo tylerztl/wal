@@ -26,12 +26,8 @@ import (
 	"sync"
 	"time"
 
-	raftpb2 "github.com/coreos/etcd/raft/raftpb"
 	"go.etcd.io/etcd/pkg/fileutil"
 	"go.etcd.io/etcd/pkg/pbutil"
-	"go.etcd.io/etcd/raft"
-	"go.etcd.io/etcd/raft/raftpb"
-	"go.etcd.io/etcd/wal/walpb"
 	"go.uber.org/zap"
 )
 
@@ -78,12 +74,12 @@ type WAL struct {
 	// dirFile is a fd for the wal directory for syncing on Rename
 	dirFile *os.File
 
-	metadata []byte           // metadata recorded at the head of each WAL
-	state    raftpb.HardState // hardstate recorded at the head of WAL
+	metadata []byte    // metadata recorded at the head of each WAL
+	state    HardState // hardstate recorded at the head of WAL
 
-	start     walpb.Snapshot // snapshot to start reading
-	decoder   *decoder       // decoder to decode records
-	readClose func() error   // closer for decode reader
+	start     Snapshot     // snapshot to start reading
+	decoder   *decoder     // decoder to decode records
+	readClose func() error // closer for decode reader
 
 	unsafeNoSync bool // if set, do not fsync
 
@@ -165,10 +161,10 @@ func Create(lg *zap.Logger, dirpath string, metadata []byte) (*WAL, error) {
 	if err = w.saveCrc(0); err != nil {
 		return nil, err
 	}
-	if err = w.encoder.encode(&walpb.Record{Type: metadataType, Data: metadata}); err != nil {
+	if err = w.encoder.encode(&Record{Type: metadataType, Data: metadata}); err != nil {
 		return nil, err
 	}
-	if err = w.SaveSnapshot(walpb.Snapshot{}); err != nil {
+	if err = w.SaveSnapshot(Snapshot{}); err != nil {
 		return nil, err
 	}
 
@@ -289,7 +285,7 @@ func (w *WAL) renameWALUnlock(tmpdirpath string) (*WAL, error) {
 	}
 
 	// reopen and relock
-	newWAL, oerr := Open(w.lg, w.dir, walpb.Snapshot{})
+	newWAL, oerr := Open(w.lg, w.dir, Snapshot{})
 	if oerr != nil {
 		return nil, oerr
 	}
@@ -306,7 +302,7 @@ func (w *WAL) renameWALUnlock(tmpdirpath string) (*WAL, error) {
 // The returned WAL is ready to read and the first record will be the one after
 // the given snap. The WAL cannot be appended to before reading out all of its
 // previous records.
-func Open(lg *zap.Logger, dirpath string, snap walpb.Snapshot) (*WAL, error) {
+func Open(lg *zap.Logger, dirpath string, snap Snapshot) (*WAL, error) {
 	w, err := openAtIndex(lg, dirpath, snap, true)
 	if err != nil {
 		return nil, err
@@ -319,11 +315,11 @@ func Open(lg *zap.Logger, dirpath string, snap walpb.Snapshot) (*WAL, error) {
 
 // OpenForRead only opens the wal files for read.
 // Write on a read only wal panics.
-func OpenForRead(lg *zap.Logger, dirpath string, snap walpb.Snapshot) (*WAL, error) {
+func OpenForRead(lg *zap.Logger, dirpath string, snap Snapshot) (*WAL, error) {
 	return openAtIndex(lg, dirpath, snap, false)
 }
 
-func openAtIndex(lg *zap.Logger, dirpath string, snap walpb.Snapshot, write bool) (*WAL, error) {
+func openAtIndex(lg *zap.Logger, dirpath string, snap Snapshot, write bool) (*WAL, error) {
 	if lg == nil {
 		lg = zap.NewNop()
 	}
@@ -361,7 +357,7 @@ func openAtIndex(lg *zap.Logger, dirpath string, snap walpb.Snapshot, write bool
 	return w, nil
 }
 
-func selectWALFiles(lg *zap.Logger, dirpath string, snap walpb.Snapshot) ([]string, int, error) {
+func selectWALFiles(lg *zap.Logger, dirpath string, snap Snapshot) ([]string, int, error) {
 	names, err := readWALNames(lg, dirpath)
 	if err != nil {
 		return nil, -1, err
@@ -417,11 +413,11 @@ func openWALFiles(lg *zap.Logger, dirpath string, names []string, nameIndex int,
 // TODO: detect not-last-snap error.
 // TODO: maybe loose the checking of match.
 // After ReadAll, the WAL will be ready for appending new records.
-func (w *WAL) ReadAll() (metadata []byte, state raftpb.HardState, ents []raftpb.Entry, err error) {
+func (w *WAL) ReadAll() (metadata []byte, state HardState, ents []Entry, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	rec := &walpb.Record{}
+	rec := &Record{}
 
 	if w.decoder == nil {
 		return nil, state, nil, ErrDecoderNotFound
@@ -466,7 +462,7 @@ func (w *WAL) ReadAll() (metadata []byte, state raftpb.HardState, ents []raftpb.
 			decoder.updateCRC(rec.Crc)
 
 		case snapshotType:
-			var snap walpb.Snapshot
+			var snap Snapshot
 			pbutil.MustUnmarshal(&snap, rec.Data)
 			if snap.Index == w.start.Index {
 				if snap.Term != w.start.Term {
@@ -521,7 +517,7 @@ func (w *WAL) ReadAll() (metadata []byte, state raftpb.HardState, ents []raftpb.
 		w.readClose()
 		w.readClose = nil
 	}
-	w.start = walpb.Snapshot{}
+	w.start = Snapshot{}
 
 	w.metadata = metadata
 
@@ -539,12 +535,12 @@ func (w *WAL) ReadAll() (metadata []byte, state raftpb.HardState, ents []raftpb.
 
 // ValidSnapshotEntries returns all the valid snapshot entries in the wal logs in the given directory.
 // Snapshot entries are valid if their index is less than or equal to the most recent committed hardstate.
-func ValidSnapshotEntries(lg *zap.Logger, walDir string) ([]walpb.Snapshot, error) {
-	var snaps []walpb.Snapshot
-	var state raftpb.HardState
+func ValidSnapshotEntries(lg *zap.Logger, walDir string) ([]Snapshot, error) {
+	var snaps []Snapshot
+	var state HardState
 	var err error
 
-	rec := &walpb.Record{}
+	rec := &Record{}
 	names, err := readWALNames(lg, walDir)
 	if err != nil {
 		return nil, err
@@ -568,7 +564,7 @@ func ValidSnapshotEntries(lg *zap.Logger, walDir string) ([]walpb.Snapshot, erro
 	for err = decoder.decode(rec); err == nil; err = decoder.decode(rec) {
 		switch rec.Type {
 		case snapshotType:
-			var loadedSnap walpb.Snapshot
+			var loadedSnap Snapshot
 			pbutil.MustUnmarshal(&loadedSnap, rec.Data)
 			snaps = append(snaps, loadedSnap)
 		case stateType:
@@ -609,12 +605,12 @@ func ValidSnapshotEntries(lg *zap.Logger, walDir string) ([]walpb.Snapshot, erro
 // If it cannot read out the expected snap, it will return ErrSnapshotNotFound.
 // If the loaded snap doesn't match with the expected one, it will
 // return error ErrSnapshotMismatch.
-func Verify(lg *zap.Logger, walDir string, snap walpb.Snapshot) error {
+func Verify(lg *zap.Logger, walDir string, snap Snapshot) error {
 	var metadata []byte
 	var err error
 	var match bool
 
-	rec := &walpb.Record{}
+	rec := &Record{}
 
 	if lg == nil {
 		lg = zap.NewNop()
@@ -655,7 +651,7 @@ func Verify(lg *zap.Logger, walDir string, snap walpb.Snapshot) error {
 			}
 			decoder.updateCRC(rec.Crc)
 		case snapshotType:
-			var loadedSnap walpb.Snapshot
+			var loadedSnap Snapshot
 			pbutil.MustUnmarshal(&loadedSnap, rec.Data)
 			if loadedSnap.Index == snap.Index {
 				if loadedSnap.Term != snap.Term {
@@ -723,7 +719,7 @@ func (w *WAL) cut() error {
 		return err
 	}
 
-	if err = w.encoder.encode(&walpb.Record{Type: metadataType, Data: w.metadata}); err != nil {
+	if err = w.encoder.encode(&Record{Type: metadataType, Data: w.metadata}); err != nil {
 		return err
 	}
 
@@ -875,10 +871,10 @@ func (w *WAL) Close() error {
 	return w.dirFile.Close()
 }
 
-func (w *WAL) saveEntry(e *raftpb.Entry) error {
+func (w *WAL) saveEntry(e *Entry) error {
 	// TODO: add MustMarshalTo to reduce one allocation.
 	b := pbutil.MustMarshal(e)
-	rec := &walpb.Record{Type: entryType, Data: b}
+	rec := &Record{Type: entryType, Data: b}
 	if err := w.encoder.encode(rec); err != nil {
 		return err
 	}
@@ -886,26 +882,26 @@ func (w *WAL) saveEntry(e *raftpb.Entry) error {
 	return nil
 }
 
-func (w *WAL) saveState(s *raftpb.HardState) error {
-	if raft.IsEmptyHardState(raftpb2.HardState(*s)) {
+func (w *WAL) saveState(s *HardState) error {
+	if IsEmptyHardState(*s) {
 		return nil
 	}
 	w.state = *s
 	b := pbutil.MustMarshal(s)
-	rec := &walpb.Record{Type: stateType, Data: b}
+	rec := &Record{Type: stateType, Data: b}
 	return w.encoder.encode(rec)
 }
 
-func (w *WAL) Save(st raftpb.HardState, ents []raftpb.Entry) error {
+func (w *WAL) Save(st HardState, ents []Entry) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
 	// short cut, do not call sync
-	if raft.IsEmptyHardState(raftpb2.HardState(st)) && len(ents) == 0 {
+	if IsEmptyHardState(st) && len(ents) == 0 {
 		return nil
 	}
 
-	mustSync := raft.MustSync(raftpb2.HardState(st), raftpb2.HardState(w.state), len(ents))
+	mustSync := MustSync(st, w.state, len(ents))
 
 	// TODO(xiangli): no more reference operator
 	for i := range ents {
@@ -931,13 +927,13 @@ func (w *WAL) Save(st raftpb.HardState, ents []raftpb.Entry) error {
 	return w.cut()
 }
 
-func (w *WAL) SaveSnapshot(e walpb.Snapshot) error {
+func (w *WAL) SaveSnapshot(e Snapshot) error {
 	b := pbutil.MustMarshal(&e)
 
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	rec := &walpb.Record{Type: snapshotType, Data: b}
+	rec := &Record{Type: snapshotType, Data: b}
 	if err := w.encoder.encode(rec); err != nil {
 		return err
 	}
@@ -949,7 +945,7 @@ func (w *WAL) SaveSnapshot(e walpb.Snapshot) error {
 }
 
 func (w *WAL) saveCrc(prevCrc uint32) error {
-	return w.encoder.encode(&walpb.Record{Type: crcType, Crc: prevCrc})
+	return w.encoder.encode(&Record{Type: crcType, Crc: prevCrc})
 }
 
 func (w *WAL) tail() *fileutil.LockedFile {

@@ -23,7 +23,6 @@ import (
 
 	"go.etcd.io/etcd/pkg/crc"
 	"go.etcd.io/etcd/pkg/ioutil"
-	"go.etcd.io/etcd/wal/walpb"
 )
 
 // walPageBytes is the alignment for flushing records to the backing Writer.
@@ -59,7 +58,7 @@ func newFileEncoder(f *os.File, prevCrc uint32) (*encoder, error) {
 	return newEncoder(f, prevCrc, int(offset)), nil
 }
 
-func (e *encoder) encode(rec *walpb.Record) error {
+func (e *encoder) encode(rec *Record) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 

@@ -20,7 +20,6 @@ import (
 	"strings"
 
 	"go.etcd.io/etcd/pkg/fileutil"
-
 	"go.uber.org/zap"
 )
 

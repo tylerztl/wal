@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package wal;
+
+option go_package = "github.com/BeDreamCoder/wal";
+
+message Record {
+    int64 type = 1;
+    uint32 crc = 2;
+    bytes data = 3;
+}
+
+enum EntryType {
+    EntryNormal = 0;
+    EntryConfChange = 1;
+}
+
+message Entry {
+    uint64 index = 1;
+    EntryType type = 2;
+    bytes data = 3;
+}
+
+message Snapshot {
+    uint64 index = 1;
+    uint64 term = 2;
+}
+
+message HardState {
+    uint64 term = 1;
+    uint64 vote = 2;
+    uint64 commit = 3;
+}

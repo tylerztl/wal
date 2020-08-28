@@ -17,14 +17,12 @@ package wal
 import (
 	"bufio"
 	"encoding/binary"
+	"errors"
 	"hash"
 	"io"
 	"sync"
 
 	"go.etcd.io/etcd/pkg/crc"
-	"go.etcd.io/etcd/pkg/pbutil"
-	"go.etcd.io/etcd/raft/raftpb"
-	"go.etcd.io/etcd/wal/walpb"
 )
 
 const minSectorSize = 512
@@ -52,7 +50,7 @@ func newDecoder(r ...io.Reader) *decoder {
 	}
 }
 
-func (d *decoder) decode(rec *walpb.Record) error {
+func (d *decoder) decode(rec *Record) error {
 	rec.Reset()
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -64,7 +62,7 @@ func (d *decoder) decode(rec *walpb.Record) error {
 // thus entry size should never exceed 10 MB
 const maxWALEntrySizeLimit = int64(10 * 1024 * 1024)
 
-func (d *decoder) decodeRecord(rec *walpb.Record) error {
+func (d *decoder) decodeRecord(rec *Record) error {
 	if len(d.brs) == 0 {
 		return io.EOF
 	}
@@ -139,7 +137,7 @@ func (d *decoder) isTornEntry(data []byte) bool {
 
 	fileOff := d.lastValidOff + frameSizeBytes
 	curOff := 0
-	chunks := [][]byte{}
+	var chunks [][]byte
 	// split data on sector boundaries
 	for curOff < len(data) {
 		chunkLen := int(minSectorSize - (fileOff % minSectorSize))
@@ -177,20 +175,16 @@ func (d *decoder) lastCRC() uint32 {
 
 func (d *decoder) lastOffset() int64 { return d.lastValidOff }
 
-func mustUnmarshalEntry(d []byte) raftpb.Entry {
-	var e raftpb.Entry
-	pbutil.MustUnmarshal(&e, d)
-	return e
-}
-
-func mustUnmarshalState(d []byte) raftpb.HardState {
-	var s raftpb.HardState
-	pbutil.MustUnmarshal(&s, d)
-	return s
-}
-
 func readInt64(r io.Reader) (int64, error) {
 	var n int64
 	err := binary.Read(r, binary.LittleEndian, &n)
 	return n, err
+}
+
+func (m *Record) Validate(crc uint32) error {
+	if m.Crc == crc {
+		return nil
+	}
+	m.Reset()
+	return errors.New("record crc mismatch")
 }

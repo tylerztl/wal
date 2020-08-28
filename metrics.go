@@ -18,7 +18,7 @@ import "github.com/prometheus/client_golang/prometheus"
 
 var (
 	walFsyncSec = prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: "etcd",
+		Namespace: "wal",
 		Subsystem: "disk",
 		Name:      "wal_fsync_duration_seconds",
 		Help:      "The latency distributions of fsync called by WAL.",
@@ -29,7 +29,7 @@ var (
 	})
 
 	walWriteBytes = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: "etcd",
+		Namespace: "wal",
 		Subsystem: "disk",
 		Name:      "wal_write_bytes_total",
 		Help:      "Total number of bytes written in WAL.",
