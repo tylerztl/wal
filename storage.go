@@ -2,9 +2,6 @@ package wal
 
 import (
 	"io"
-	"log"
-	"os"
-	"reflect"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -30,15 +27,17 @@ type Storage interface {
 type CustomRecord interface {
 	Marshal() (data []byte, err error)
 	Unmarshal(data []byte) (interface{}, error)
+	// index of the last record saved to the wal
+	RecordIndex() uint64
 }
 
-var recordTypes sync.Map // map[RecordType]reflect.Type
+var recordTypes sync.Map // map[RecordType]CustomRecord
 
-func RegisterReocrd(rt RecordType, record CustomRecord) {
+func RegisterRecord(rt RecordType, record CustomRecord) {
 	if _, ok := recordTypes.Load(rt); ok {
 		panic(errors.Errorf("[%d] record type is already registered", rt))
 	}
-	recordTypes.Store(rt, reflect.TypeOf(record))
+	recordTypes.Store(rt, record)
 }
 
 type storage struct {
@@ -93,26 +92,4 @@ func ReadWAL(lg *zap.Logger, waldir string, snap Snapshot, unsafeNoFsync bool) (
 		break
 	}
 	return w, wmetadata, st, ents, records
-}
-
-// OpenWAL returns a WAL ready for reading.
-func OpenWAL(waldir string, snapshot Snapshot) *WAL {
-	if !Exist(waldir) {
-		if err := os.Mkdir(waldir, 0750); err != nil {
-			log.Fatalf("cannot create dir for wal (%v)", err)
-		}
-
-		w, err := Create(zap.NewExample(), waldir, nil)
-		if err != nil {
-			log.Fatalf("create wal error (%v)", err)
-		}
-		w.Close()
-	}
-
-	log.Printf("loading WAL at index %d", snapshot.Index)
-	w, err := Open(zap.NewExample(), waldir, snapshot)
-	if err != nil {
-		log.Fatalf("error loading wal (%v)", err)
-	}
-	return w
 }

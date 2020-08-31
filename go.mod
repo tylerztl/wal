@@ -15,6 +15,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.7.1
 	github.com/prometheus/common v0.13.0 // indirect
+	github.com/stretchr/testify v1.4.0
 	go.etcd.io/etcd v3.3.25+incompatible
 	go.uber.org/zap v1.15.0
 	golang.org/x/mod v0.1.1-0.20191107180719-034126e5016b // indirect

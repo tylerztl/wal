@@ -899,6 +899,7 @@ func (w *WAL) saveRecord(rt RecordType, e CustomRecord) error {
 	if err := w.encoder.encode(rec); err != nil {
 		return err
 	}
+	w.enti = e.RecordIndex()
 	return nil
 }
 
@@ -952,12 +953,13 @@ func (w *WAL) SaveRecords(rt RecordType, crs []CustomRecord) error {
 	if len(crs) == 0 {
 		return nil
 	}
-	wantType, ok := recordTypes.Load(rt)
+	rec, ok := recordTypes.Load(rt)
 	if !ok {
 		return errors.Errorf("unregister record type: %d", rt)
 	}
 	gotType := reflect.TypeOf(crs[0])
-	if wantType != gotType {
+	wantType := reflect.TypeOf(rec)
+	if gotType != wantType {
 		return errors.Errorf("given record data type [%v] mismatch register [%v]", gotType, wantType)
 	}
 

@@ -690,7 +690,7 @@ func TestReleaseLockTo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(p)
+	//defer os.RemoveAll(p)
 	// create WAL
 	w, err := Create(zap.NewExample(), p, nil)
 	defer func() {
