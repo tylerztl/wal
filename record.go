@@ -1,39 +1,35 @@
 package wal
 
 import (
-	"go.etcd.io/etcd/pkg/pbutil"
+	"reflect"
+	"sync"
+
+	"github.com/pkg/errors"
 )
 
-func mustUnmarshalEntry(d []byte) Entry {
-	var e Entry
-	pbutil.MustUnmarshal(&e, d)
-	return e
+var recordTypes sync.Map // map[RecordType]reflect.Type
+
+func RegisterReocrd(rt RecordType, record CustomRecord) {
+	if _, ok := recordTypes.Load(rt); ok {
+		panic(errors.Errorf("[%d] record type is already registered", rt))
+	}
+	recordTypes.Store(rt, reflect.TypeOf(record))
 }
 
-func mustUnmarshalState(d []byte) HardState {
-	var s HardState
-	pbutil.MustUnmarshal(&s, d)
-	return s
+type CustomRecord interface {
+	Marshal() (data []byte, err error)
+	Unmarshal(data []byte) (interface{}, error)
 }
 
-var emptyState = HardState{}
-
-func isHardStateEqual(a, b HardState) bool {
-	return a.Term == b.Term && a.Vote == b.Vote && a.Commit == b.Commit
-}
-
-// IsEmptyHardState returns true if the given HardState is empty.
-func IsEmptyHardState(st HardState) bool {
-	return isHardStateEqual(st, emptyState)
-}
-
-// MustSync returns true if the hard state and count of Raft entries indicate
-// that a synchronous write to persistent storage is required.
-func MustSync(st, prevst HardState, entsnum int) bool {
-	// Persistent state on all servers:
-	// (Updated on stable storage before responding to RPCs)
-	// currentTerm
-	// votedFor
-	// log entries[]
-	return entsnum != 0 || st.Vote != prevst.Vote || st.Term != prevst.Term
+// LogStore is used to provide an interface for storing
+// and retrieving logs.
+type LogStore interface {
+	Sync() error
+	SetUnsafeNoFsync()
+	ReadAll() (metadata []byte, state HardState, ents []Entry, records []interface{}, err error)
+	Save(st HardState, ents []Entry) error
+	SaveSnapshot(e Snapshot) error
+	SaveRecords(rt RecordType, crs []CustomRecord) error
+	// Close closes the current WAL file and directory.
+	Close() error
 }

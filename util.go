@@ -17,9 +17,11 @@ package wal
 import (
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"go.etcd.io/etcd/pkg/fileutil"
+	"go.etcd.io/etcd/pkg/pbutil"
 	"go.uber.org/zap"
 )
 
@@ -108,4 +110,30 @@ func parseWALName(str string) (seq, index uint64, err error) {
 
 func walName(seq, index uint64) string {
 	return fmt.Sprintf("%016x-%016x.wal", seq, index)
+}
+
+func closeAll(lg *zap.Logger, rcs ...io.ReadCloser) error {
+	stringArr := make([]string, 0)
+	for _, f := range rcs {
+		if err := f.Close(); err != nil {
+			lg.Warn("failed to close: ", zap.Error(err))
+			stringArr = append(stringArr, err.Error())
+		}
+	}
+	if len(stringArr) == 0 {
+		return nil
+	}
+	return errors.New(strings.Join(stringArr, ", "))
+}
+
+func mustUnmarshalEntry(d []byte) Entry {
+	var e Entry
+	pbutil.MustUnmarshal(&e, d)
+	return e
+}
+
+func mustUnmarshalState(d []byte) HardState {
+	var s HardState
+	pbutil.MustUnmarshal(&s, d)
+	return s
 }

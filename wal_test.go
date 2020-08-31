@@ -65,16 +65,16 @@ func TestNew(t *testing.T) {
 
 	var wb bytes.Buffer
 	e := newEncoder(&wb, 0, 0)
-	err = e.encode(&Record{Type: crcType, Crc: 0})
+	err = e.encode(&Record{Type: int64(crcType), Crc: 0})
 	if err != nil {
 		t.Fatalf("err = %v, want nil", err)
 	}
-	err = e.encode(&Record{Type: metadataType, Data: []byte("somedata")})
+	err = e.encode(&Record{Type: int64(metadataType), Data: []byte("somedata")})
 	if err != nil {
 		t.Fatalf("err = %v, want nil", err)
 	}
 	r := &Record{
-		Type: snapshotType,
+		Type: int64(snapshotType),
 		Data: pbutil.MustMarshal(&Snapshot{}),
 	}
 	if err = e.encode(r); err != nil {
@@ -282,7 +282,7 @@ func TestCut(t *testing.T) {
 	}
 	defer w.Close()
 
-	state := HardState{Term: 1}
+	state := HardState{}
 	if err = w.Save(state, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -301,7 +301,7 @@ func TestCut(t *testing.T) {
 	if err = w.cut(); err != nil {
 		t.Fatal(err)
 	}
-	snap := Snapshot{Index: 2, Term: 1}
+	snap := Snapshot{Index: 2}
 	if err = w.SaveSnapshot(snap); err != nil {
 		t.Fatal(err)
 	}
@@ -322,7 +322,7 @@ func TestCut(t *testing.T) {
 		decoder: newDecoder(f),
 		start:   snap,
 	}
-	_, gst, _, err := nw.ReadAll()
+	_, gst, _, _, err := nw.ReadAll()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -343,7 +343,7 @@ func TestSaveWithCut(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	state := HardState{Term: 1}
+	state := HardState{}
 	if err = w.Save(state, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -376,7 +376,7 @@ func TestSaveWithCut(t *testing.T) {
 		t.Errorf("name = %s, want %s", g, wname)
 	}
 
-	_, newhardstate, entries, err := neww.ReadAll()
+	_, newhardstate, entries, _, err := neww.ReadAll()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -412,7 +412,7 @@ func TestRecover(t *testing.T) {
 	if err = w.Save(HardState{}, ents); err != nil {
 		t.Fatal(err)
 	}
-	sts := []HardState{{Term: 1, Vote: 1, Commit: 1}, {Term: 2, Vote: 2, Commit: 2}}
+	sts := []HardState{{Committed: 1}, {Committed: 2}}
 	for _, s := range sts {
 		if err = w.Save(s, nil); err != nil {
 			t.Fatal(err)
@@ -423,7 +423,7 @@ func TestRecover(t *testing.T) {
 	if w, err = Open(zap.NewExample(), p, Snapshot{}); err != nil {
 		t.Fatal(err)
 	}
-	metadata, state, entries, err := w.ReadAll()
+	metadata, state, entries, _, err := w.ReadAll()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -550,7 +550,7 @@ func TestRecoverAfterCut(t *testing.T) {
 			}
 			continue
 		}
-		metadata, _, entries, err := w.ReadAll()
+		metadata, _, entries, _, err := w.ReadAll()
 		if err != nil {
 			t.Errorf("#%d: err = %v, want nil", i, err)
 			continue
@@ -591,7 +591,7 @@ func TestOpenAtUncommittedIndex(t *testing.T) {
 		t.Fatal(err)
 	}
 	// commit up to index 0, try to read index 1
-	if _, _, _, err = w.ReadAll(); err != nil {
+	if _, _, _, _, err = w.ReadAll(); err != nil {
 		t.Errorf("err = %v, want nil", err)
 	}
 	w.Close()
@@ -633,7 +633,7 @@ func TestOpenForRead(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer w2.Close()
-	_, _, ents, err := w2.ReadAll()
+	_, _, ents, _, err := w2.ReadAll()
 	if err != nil {
 		t.Fatalf("err = %v, want nil", err)
 	}
@@ -665,7 +665,7 @@ func TestOpenWithMaxIndex(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, _, _, err = w.ReadAll()
+	_, _, _, _, err = w.ReadAll()
 	if err == nil || err != ErrSliceOutOfRange {
 		t.Fatalf("err = %v, want ErrSliceOutOfRange", err)
 	}
@@ -772,7 +772,7 @@ func TestTailWriteNoSlackSpace(t *testing.T) {
 	// write some entries
 	for i := 1; i <= 5; i++ {
 		es := []Entry{{Index: uint64(i), Data: []byte{byte(i)}}}
-		if err = w.Save(HardState{Term: 1}, es); err != nil {
+		if err = w.Save(HardState{}, es); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -791,7 +791,7 @@ func TestTailWriteNoSlackSpace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, _, ents, rerr := w.ReadAll()
+	_, _, ents, _, rerr := w.ReadAll()
 	if rerr != nil {
 		t.Fatal(rerr)
 	}
@@ -801,7 +801,7 @@ func TestTailWriteNoSlackSpace(t *testing.T) {
 	// write more entries
 	for i := 6; i <= 10; i++ {
 		es := []Entry{{Index: uint64(i), Data: []byte{byte(i)}}}
-		if err = w.Save(HardState{Term: 1}, es); err != nil {
+		if err = w.Save(HardState{}, es); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -812,7 +812,7 @@ func TestTailWriteNoSlackSpace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, _, ents, rerr = w.ReadAll()
+	_, _, ents, _, rerr = w.ReadAll()
 	if rerr != nil {
 		t.Fatal(rerr)
 	}
@@ -853,7 +853,7 @@ func TestRestartCreateWal(t *testing.T) {
 	}
 	defer w.Close()
 
-	if meta, _, _, rerr := w.ReadAll(); rerr != nil || string(meta) != "abc" {
+	if meta, _, _, _, rerr := w.ReadAll(); rerr != nil || string(meta) != "abc" {
 		t.Fatalf("got error %v and meta %q, expected nil and %q", rerr, meta, "abc")
 	}
 }
@@ -916,7 +916,7 @@ func TestOpenOnTornWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 	// seek up to clobbered entry
-	_, _, _, err = w.ReadAll()
+	_, _, _, _, err = w.ReadAll()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -937,7 +937,7 @@ func TestOpenOnTornWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, _, ents, rerr := w.ReadAll()
+	_, _, ents, _, rerr := w.ReadAll()
 	if rerr != nil {
 		// CRC error? the old entries were likely never truncated away
 		t.Fatal(rerr)
@@ -992,7 +992,7 @@ func TestReadAllFail(t *testing.T) {
 	}
 	f.Close()
 	// try to read without opening the WAL
-	_, _, _, err = f.ReadAll()
+	_, _, _, _, err = f.ReadAll()
 	if err == nil || err != ErrDecoderNotFound {
 		t.Fatalf("err = %v, want ErrDecoderNotFound", err)
 	}
@@ -1006,13 +1006,13 @@ func TestValidSnapshotEntries(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(p)
-	snap0 := Snapshot{Index: 0, Term: 0}
-	snap1 := Snapshot{Index: 1, Term: 1}
-	state1 := HardState{Commit: 1, Term: 1}
-	snap2 := Snapshot{Index: 2, Term: 1}
-	snap3 := Snapshot{Index: 3, Term: 2}
-	state2 := HardState{Commit: 3, Term: 2}
-	snap4 := Snapshot{Index: 4, Term: 2} // will be orphaned since the last committed entry will be snap3
+	snap0 := Snapshot{Index: 0}
+	snap1 := Snapshot{Index: 1}
+	state1 := HardState{Committed: 1}
+	snap2 := Snapshot{Index: 2}
+	snap3 := Snapshot{Index: 3}
+	state2 := HardState{Committed: 3}
+	snap4 := Snapshot{Index: 4} // will be orphaned since the last committed entry will be snap3
 	func() {
 		w, err := Create(zap.NewExample(), p, nil)
 		if err != nil {
@@ -1063,12 +1063,12 @@ func TestValidSnapshotEntriesAfterPurgeWal(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(p)
-	snap0 := Snapshot{Index: 0, Term: 0}
-	snap1 := Snapshot{Index: 1, Term: 1}
-	state1 := HardState{Commit: 1, Term: 1}
-	snap2 := Snapshot{Index: 2, Term: 1}
-	snap3 := Snapshot{Index: 3, Term: 2}
-	state2 := HardState{Commit: 3, Term: 2}
+	snap0 := Snapshot{Index: 0}
+	snap1 := Snapshot{Index: 1}
+	state1 := HardState{Committed: 1}
+	snap2 := Snapshot{Index: 2}
+	snap3 := Snapshot{Index: 3}
+	state2 := HardState{Committed: 3}
 	func() {
 		w, err := Create(zap.NewExample(), p, nil)
 		if err != nil {
