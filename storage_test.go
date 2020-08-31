@@ -43,7 +43,7 @@ func init() {
 func TestWAL_SaveRecords(t *testing.T) {
 	p, err := ioutil.TempDir(os.TempDir(), "waltest")
 	assert.NoError(t, err)
-	//defer os.RemoveAll(p)
+	defer os.RemoveAll(p)
 
 	w, err := Create(zap.NewExample(), p, []byte("metadata"))
 	assert.NoError(t, err)
