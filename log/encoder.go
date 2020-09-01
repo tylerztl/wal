@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package wal
+package log
 
 import (
 	"encoding/binary"
@@ -21,6 +21,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/BeDreamCoder/wal/pb"
 	"go.etcd.io/etcd/pkg/crc"
 	"go.etcd.io/etcd/pkg/ioutil"
 )
@@ -58,7 +59,7 @@ func newFileEncoder(f *os.File, prevCrc uint32) (*encoder, error) {
 	return newEncoder(f, prevCrc, int(offset)), nil
 }
 
-func (e *encoder) encode(rec *Record) error {
+func (e *encoder) encode(rec *pb.Record) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 

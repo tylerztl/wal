@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package wal
+package log
 
 import (
 	"bytes"
 	"fmt"
+	"github.com/BeDreamCoder/wal/pb"
 	"hash/crc32"
 	"io"
 	"os"
@@ -75,10 +76,10 @@ type WAL struct {
 	// dirFile is a fd for the wal directory for syncing on Rename
 	dirFile *os.File
 
-	metadata []byte    // metadata recorded at the head of each WAL
-	state    HardState // hardstate recorded at the head of WAL
+	metadata []byte       // metadata recorded at the head of each WAL
+	state    pb.HardState // hardstate recorded at the head of WAL
 
-	start     Snapshot     // snapshot to start reading
+	start     pb.Snapshot  // snapshot to start reading
 	decoder   *decoder     // decoder to decode records
 	readClose func() error // closer for decode reader
 
@@ -162,10 +163,10 @@ func Create(lg *zap.Logger, dirpath string, metadata []byte) (*WAL, error) {
 	if err = w.saveCrc(0); err != nil {
 		return nil, err
 	}
-	if err = w.encoder.encode(&Record{Type: int64(metadataType), Data: metadata}); err != nil {
+	if err = w.encoder.encode(&pb.Record{Type: int64(metadataType), Data: metadata}); err != nil {
 		return nil, err
 	}
-	if err = w.SaveSnapshot(Snapshot{}); err != nil {
+	if err = w.SaveSnapshot(pb.Snapshot{}); err != nil {
 		return nil, err
 	}
 
@@ -286,7 +287,7 @@ func (w *WAL) renameWALUnlock(tmpdirpath string) (*WAL, error) {
 	}
 
 	// reopen and relock
-	newWAL, oerr := Open(w.lg, w.dir, Snapshot{})
+	newWAL, oerr := Open(w.lg, w.dir, pb.Snapshot{})
 	if oerr != nil {
 		return nil, oerr
 	}
@@ -303,7 +304,7 @@ func (w *WAL) renameWALUnlock(tmpdirpath string) (*WAL, error) {
 // The returned WAL is ready to read and the first record will be the one after
 // the given snap. The WAL cannot be appended to before reading out all of its
 // previous records.
-func Open(lg *zap.Logger, dirpath string, snap Snapshot) (*WAL, error) {
+func Open(lg *zap.Logger, dirpath string, snap pb.Snapshot) (*WAL, error) {
 	w, err := openAtIndex(lg, dirpath, snap, true)
 	if err != nil {
 		return nil, err
@@ -316,11 +317,11 @@ func Open(lg *zap.Logger, dirpath string, snap Snapshot) (*WAL, error) {
 
 // OpenForRead only opens the wal files for read.
 // Write on a read only wal panics.
-func OpenForRead(lg *zap.Logger, dirpath string, snap Snapshot) (*WAL, error) {
+func OpenForRead(lg *zap.Logger, dirpath string, snap pb.Snapshot) (*WAL, error) {
 	return openAtIndex(lg, dirpath, snap, false)
 }
 
-func openAtIndex(lg *zap.Logger, dirpath string, snap Snapshot, write bool) (*WAL, error) {
+func openAtIndex(lg *zap.Logger, dirpath string, snap pb.Snapshot, write bool) (*WAL, error) {
 	if lg == nil {
 		lg = zap.NewNop()
 	}
@@ -358,7 +359,7 @@ func openAtIndex(lg *zap.Logger, dirpath string, snap Snapshot, write bool) (*WA
 	return w, nil
 }
 
-func selectWALFiles(lg *zap.Logger, dirpath string, snap Snapshot) ([]string, int, error) {
+func selectWALFiles(lg *zap.Logger, dirpath string, snap pb.Snapshot) ([]string, int, error) {
 	names, err := readWALNames(lg, dirpath)
 	if err != nil {
 		return nil, -1, err
@@ -414,11 +415,11 @@ func openWALFiles(lg *zap.Logger, dirpath string, names []string, nameIndex int,
 // TODO: detect not-last-snap error.
 // TODO: maybe loose the checking of match.
 // After ReadAll, the WAL will be ready for appending new records.
-func (w *WAL) ReadAll() (metadata []byte, state HardState, ents []Entry, records []interface{}, err error) {
+func (w *WAL) ReadAll() (metadata []byte, state pb.HardState, ents []pb.Entry, records []interface{}, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	rec := &Record{}
+	rec := &pb.Record{}
 
 	if w.decoder == nil {
 		return nil, state, nil, records, ErrDecoderNotFound
@@ -462,7 +463,7 @@ func (w *WAL) ReadAll() (metadata []byte, state HardState, ents []Entry, records
 			decoder.updateCRC(rec.Crc)
 
 		case int64(snapshotType):
-			var snap Snapshot
+			var snap pb.Snapshot
 			pbutil.MustUnmarshal(&snap, rec.Data)
 			if snap.Index == w.start.Index {
 				match = true
@@ -520,7 +521,7 @@ func (w *WAL) ReadAll() (metadata []byte, state HardState, ents []Entry, records
 		w.readClose()
 		w.readClose = nil
 	}
-	w.start = Snapshot{}
+	w.start = pb.Snapshot{}
 
 	w.metadata = metadata
 
@@ -538,12 +539,12 @@ func (w *WAL) ReadAll() (metadata []byte, state HardState, ents []Entry, records
 
 // ValidSnapshotEntries returns all the valid snapshot entries in the wal logs in the given directory.
 // Snapshot entries are valid if their index is less than or equal to the most recent committed hardstate.
-func ValidSnapshotEntries(lg *zap.Logger, walDir string) ([]Snapshot, error) {
-	var snaps []Snapshot
-	var state HardState
+func ValidSnapshotEntries(lg *zap.Logger, walDir string) ([]pb.Snapshot, error) {
+	var snaps []pb.Snapshot
+	var state pb.HardState
 	var err error
 
-	rec := &Record{}
+	rec := &pb.Record{}
 	names, err := readWALNames(lg, walDir)
 	if err != nil {
 		return nil, err
@@ -567,7 +568,7 @@ func ValidSnapshotEntries(lg *zap.Logger, walDir string) ([]Snapshot, error) {
 	for err = decoder.decode(rec); err == nil; err = decoder.decode(rec) {
 		switch rec.Type {
 		case int64(snapshotType):
-			var loadedSnap Snapshot
+			var loadedSnap pb.Snapshot
 			pbutil.MustUnmarshal(&loadedSnap, rec.Data)
 			snaps = append(snaps, loadedSnap)
 		case int64(stateType):
@@ -608,12 +609,12 @@ func ValidSnapshotEntries(lg *zap.Logger, walDir string) ([]Snapshot, error) {
 // If it cannot read out the expected snap, it will return ErrSnapshotNotFound.
 // If the loaded snap doesn't match with the expected one, it will
 // return error ErrSnapshotMismatch.
-func Verify(lg *zap.Logger, walDir string, snap Snapshot) error {
+func Verify(lg *zap.Logger, walDir string, snap pb.Snapshot) error {
 	var metadata []byte
 	var err error
 	var match bool
 
-	rec := &Record{}
+	rec := &pb.Record{}
 
 	if lg == nil {
 		lg = zap.NewNop()
@@ -654,7 +655,7 @@ func Verify(lg *zap.Logger, walDir string, snap Snapshot) error {
 			}
 			decoder.updateCRC(rec.Crc)
 		case int64(snapshotType):
-			var loadedSnap Snapshot
+			var loadedSnap pb.Snapshot
 			pbutil.MustUnmarshal(&loadedSnap, rec.Data)
 			if loadedSnap.Index == snap.Index {
 				match = true
@@ -719,7 +720,7 @@ func (w *WAL) cut() error {
 		return err
 	}
 
-	if err = w.encoder.encode(&Record{Type: int64(metadataType), Data: w.metadata}); err != nil {
+	if err = w.encoder.encode(&pb.Record{Type: int64(metadataType), Data: w.metadata}); err != nil {
 		return err
 	}
 
@@ -871,10 +872,10 @@ func (w *WAL) Close() error {
 	return w.dirFile.Close()
 }
 
-func (w *WAL) saveEntry(e *Entry) error {
+func (w *WAL) saveEntry(e *pb.Entry) error {
 	// TODO: add MustMarshalTo to reduce one allocation.
 	b := pbutil.MustMarshal(e)
-	rec := &Record{Type: int64(entryType), Data: b}
+	rec := &pb.Record{Type: int64(entryType), Data: b}
 	if err := w.encoder.encode(rec); err != nil {
 		return err
 	}
@@ -882,20 +883,20 @@ func (w *WAL) saveEntry(e *Entry) error {
 	return nil
 }
 
-func (w *WAL) saveState(s *HardState) error {
+func (w *WAL) saveState(s *pb.HardState) error {
 	if s.Committed == 0 || s.Committed == w.state.Committed {
 		return nil
 	}
 
 	w.state = *s
 	b := pbutil.MustMarshal(s)
-	rec := &Record{Type: int64(stateType), Data: b}
+	rec := &pb.Record{Type: int64(stateType), Data: b}
 	return w.encoder.encode(rec)
 }
 
 func (w *WAL) saveRecord(rt RecordType, e CustomRecord) error {
 	b := pbutil.MustMarshal(e)
-	rec := &Record{Type: int64(rt), Data: b}
+	rec := &pb.Record{Type: int64(rt), Data: b}
 	if err := w.encoder.encode(rec); err != nil {
 		return err
 	}
@@ -903,7 +904,7 @@ func (w *WAL) saveRecord(rt RecordType, e CustomRecord) error {
 	return nil
 }
 
-func (w *WAL) Save(st HardState, ents []Entry) error {
+func (w *WAL) Save(st pb.HardState, ents []pb.Entry) error {
 	if len(ents) == 0 && st.Committed == 0 {
 		return nil
 	}
@@ -932,13 +933,13 @@ func (w *WAL) Save(st HardState, ents []Entry) error {
 	return w.cut()
 }
 
-func (w *WAL) SaveSnapshot(e Snapshot) error {
+func (w *WAL) SaveSnapshot(e pb.Snapshot) error {
 	b := pbutil.MustMarshal(&e)
 
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	rec := &Record{Type: int64(snapshotType), Data: b}
+	rec := &pb.Record{Type: int64(snapshotType), Data: b}
 	if err := w.encoder.encode(rec); err != nil {
 		return err
 	}
@@ -984,7 +985,7 @@ func (w *WAL) SaveRecords(rt RecordType, crs []CustomRecord) error {
 }
 
 func (w *WAL) saveCrc(prevCrc uint32) error {
-	return w.encoder.encode(&Record{Type: int64(crcType), Crc: prevCrc})
+	return w.encoder.encode(&pb.Record{Type: int64(crcType), Crc: prevCrc})
 }
 
 func (w *WAL) tail() *fileutil.LockedFile {

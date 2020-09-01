@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package wal
+package log
 
 import (
 	"bufio"
 	"encoding/binary"
-	"errors"
 	"hash"
 	"io"
 	"sync"
 
+	"github.com/BeDreamCoder/wal/pb"
 	"go.etcd.io/etcd/pkg/crc"
 )
 
@@ -50,7 +50,7 @@ func newDecoder(r ...io.Reader) *decoder {
 	}
 }
 
-func (d *decoder) decode(rec *Record) error {
+func (d *decoder) decode(rec *pb.Record) error {
 	rec.Reset()
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -62,7 +62,7 @@ func (d *decoder) decode(rec *Record) error {
 // thus entry size should never exceed 10 MB
 const maxWALEntrySizeLimit = int64(10 * 1024 * 1024)
 
-func (d *decoder) decodeRecord(rec *Record) error {
+func (d *decoder) decodeRecord(rec *pb.Record) error {
 	if len(d.brs) == 0 {
 		return io.EOF
 	}
@@ -179,12 +179,4 @@ func readInt64(r io.Reader) (int64, error) {
 	var n int64
 	err := binary.Read(r, binary.LittleEndian, &n)
 	return n, err
-}
-
-func (m *Record) Validate(crc uint32) error {
-	if m.Crc == crc {
-		return nil
-	}
-	m.Reset()
-	return errors.New("record crc mismatch")
 }

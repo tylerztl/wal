@@ -1,3 +1,3 @@
-//go:generate protoc --proto_path=. --gofast_out=plugins=grpc,paths=source_relative:. wal.proto
+//go:generate protoc --proto_path=./pb --gofast_out=plugins=grpc,paths=source_relative:./pb wal.proto
 
 package wal

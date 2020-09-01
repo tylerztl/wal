@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package wal
+package log
 
 import (
 	"errors"
 	"fmt"
+	"github.com/BeDreamCoder/wal/pb"
 	"io"
 	"strings"
 
@@ -126,14 +127,14 @@ func closeAll(lg *zap.Logger, rcs ...io.ReadCloser) error {
 	return errors.New(strings.Join(stringArr, ", "))
 }
 
-func mustUnmarshalEntry(d []byte) Entry {
-	var e Entry
+func mustUnmarshalEntry(d []byte) pb.Entry {
+	var e pb.Entry
 	pbutil.MustUnmarshal(&e, d)
 	return e
 }
 
-func mustUnmarshalState(d []byte) HardState {
-	var s HardState
+func mustUnmarshalState(d []byte) pb.HardState {
+	var s pb.HardState
 	pbutil.MustUnmarshal(&s, d)
 	return s
 }

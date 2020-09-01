@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package wal
+package log
 
 import (
+	"github.com/BeDreamCoder/wal/pb"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -49,7 +50,7 @@ func benchmarkWriteEntry(b *testing.B, size int, batch int) {
 	for i := 0; i < size; i++ {
 		data[i] = byte(i)
 	}
-	e := &Entry{Data: data}
+	e := &pb.Entry{Data: data}
 
 	b.ResetTimer()
 	n := 0

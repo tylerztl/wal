@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package wal
+package log
 
 import (
 	"io"
@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/BeDreamCoder/wal/pb"
 	"go.etcd.io/etcd/pkg/fileutil"
 	"go.uber.org/zap"
 )
@@ -38,7 +39,7 @@ func Repair(lg *zap.Logger, dirpath string) bool {
 
 	lg.Info("repairing", zap.String("path", f.Name()))
 
-	rec := &Record{}
+	rec := &pb.Record{}
 	decoder := newDecoder(f)
 	for {
 		lastOffset := decoder.lastOffset()

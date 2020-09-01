@@ -8,11 +8,13 @@ package wal
 
 import (
 	"encoding/json"
-	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"os"
 	"testing"
 
+	"github.com/BeDreamCoder/wal/log"
+	"github.com/BeDreamCoder/wal/pb"
+	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )
 
@@ -34,10 +36,10 @@ func (m *MockRecord) RecordIndex() uint64 {
 	return m.Index
 }
 
-const mockType RecordType = 10
+const mockType log.RecordType = 10
 
 func init() {
-	RegisterRecord(mockType, &MockRecord{})
+	log.RegisterRecord(mockType, &MockRecord{})
 }
 
 func TestWAL_SaveRecords(t *testing.T) {
@@ -45,12 +47,12 @@ func TestWAL_SaveRecords(t *testing.T) {
 	assert.NoError(t, err)
 	defer os.RemoveAll(p)
 
-	w, err := Create(zap.NewExample(), p, []byte("metadata"))
+	w, err := log.Create(zap.NewExample(), p, []byte("metadata"))
 	assert.NoError(t, err)
 
 	storage := NewStorage(w)
 
-	records := []CustomRecord{
+	records := []log.CustomRecord{
 		&MockRecord{0, "a"},
 		&MockRecord{1, "b"},
 		&MockRecord{2, "c"},
@@ -58,15 +60,13 @@ func TestWAL_SaveRecords(t *testing.T) {
 	}
 
 	for _, v := range records {
-		err = storage.SaveRecords(mockType, []CustomRecord{v})
-		assert.NoError(t, err)
-		err = w.cut()
+		err = storage.SaveRecords(mockType, []log.CustomRecord{v})
 		assert.NoError(t, err)
 	}
 
 	storage.Close()
 
-	w, err = Open(zap.NewExample(), p, Snapshot{})
+	w, err = log.Open(zap.NewExample(), p, pb.Snapshot{})
 	assert.NoError(t, err)
 
 	storage2 := NewStorage(w)
@@ -81,11 +81,6 @@ func TestWAL_SaveRecords(t *testing.T) {
 		t.Logf("read custom record: %s", rec.Value)
 	}
 
-	err = storage2.Release(Snapshot{Index: 3})
+	err = storage2.Release(pb.Snapshot{Index: 3})
 	assert.NoError(t, err)
-
-	// expected remaining is 3
-	if len(w.locks) != 3 {
-		t.Errorf("len(w.locks) = %d, want %d", len(w.locks), 3)
-	}
 }
