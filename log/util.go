@@ -17,10 +17,10 @@ package log
 import (
 	"errors"
 	"fmt"
-	"github.com/BeDreamCoder/wal/pb"
 	"io"
 	"strings"
 
+	"github.com/BeDreamCoder/wal/log/walpb"
 	"go.etcd.io/etcd/pkg/fileutil"
 	"go.etcd.io/etcd/pkg/pbutil"
 	"go.uber.org/zap"
@@ -127,14 +127,14 @@ func closeAll(lg *zap.Logger, rcs ...io.ReadCloser) error {
 	return errors.New(strings.Join(stringArr, ", "))
 }
 
-func mustUnmarshalEntry(d []byte) pb.Entry {
-	var e pb.Entry
+func mustUnmarshalEntry(d []byte) walpb.Entry {
+	var e walpb.Entry
 	pbutil.MustUnmarshal(&e, d)
 	return e
 }
 
-func mustUnmarshalState(d []byte) pb.HardState {
-	var s pb.HardState
+func mustUnmarshalState(d []byte) walpb.HardState {
+	var s walpb.HardState
 	pbutil.MustUnmarshal(&s, d)
 	return s
 }

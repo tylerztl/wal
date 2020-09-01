@@ -20,7 +20,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/BeDreamCoder/wal/pb"
+	"github.com/BeDreamCoder/wal/log/walpb"
 	"go.etcd.io/etcd/pkg/fileutil"
 	"go.uber.org/zap"
 )
@@ -39,7 +39,7 @@ func Repair(lg *zap.Logger, dirpath string) bool {
 
 	lg.Info("repairing", zap.String("path", f.Name()))
 
-	rec := &pb.Record{}
+	rec := &walpb.Record{}
 	decoder := newDecoder(f)
 	for {
 		lastOffset := decoder.lastOffset()

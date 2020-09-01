@@ -21,7 +21,7 @@ import (
 	"io"
 	"sync"
 
-	"github.com/BeDreamCoder/wal/pb"
+	"github.com/BeDreamCoder/wal/log/walpb"
 	"go.etcd.io/etcd/pkg/crc"
 )
 
@@ -50,7 +50,7 @@ func newDecoder(r ...io.Reader) *decoder {
 	}
 }
 
-func (d *decoder) decode(rec *pb.Record) error {
+func (d *decoder) decode(rec *walpb.Record) error {
 	rec.Reset()
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -62,7 +62,7 @@ func (d *decoder) decode(rec *pb.Record) error {
 // thus entry size should never exceed 10 MB
 const maxWALEntrySizeLimit = int64(10 * 1024 * 1024)
 
-func (d *decoder) decodeRecord(rec *pb.Record) error {
+func (d *decoder) decodeRecord(rec *walpb.Record) error {
 	if len(d.brs) == 0 {
 		return io.EOF
 	}

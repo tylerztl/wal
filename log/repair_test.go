@@ -16,12 +16,12 @@ package log
 
 import (
 	"fmt"
-	"github.com/BeDreamCoder/wal/pb"
 	"io"
 	"io/ioutil"
 	"os"
 	"testing"
 
+	"github.com/BeDreamCoder/wal/log/walpb"
 	"go.uber.org/zap"
 )
 
@@ -41,7 +41,7 @@ func TestRepairTruncate(t *testing.T) {
 	testRepair(t, makeEnts(10), corruptf, 9)
 }
 
-func testRepair(t *testing.T, ents [][]pb.Entry, corrupt corruptFunc, expectedEnts int) {
+func testRepair(t *testing.T, ents [][]walpb.Entry, corrupt corruptFunc, expectedEnts int) {
 	p, err := ioutil.TempDir(os.TempDir(), "waltest")
 	if err != nil {
 		t.Fatal(err)
@@ -60,7 +60,7 @@ func testRepair(t *testing.T, ents [][]pb.Entry, corrupt corruptFunc, expectedEn
 	}
 
 	for _, es := range ents {
-		if err = w.Save(pb.HardState{}, es); err != nil {
+		if err = w.Save(walpb.HardState{}, es); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -77,7 +77,7 @@ func testRepair(t *testing.T, ents [][]pb.Entry, corrupt corruptFunc, expectedEn
 	}
 
 	// verify we broke the wal
-	w, err = Open(zap.NewExample(), p, pb.Snapshot{})
+	w, err = Open(zap.NewExample(), p, walpb.Snapshot{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +93,7 @@ func testRepair(t *testing.T, ents [][]pb.Entry, corrupt corruptFunc, expectedEn
 	}
 
 	// read it back
-	w, err = Open(zap.NewExample(), p, pb.Snapshot{})
+	w, err = Open(zap.NewExample(), p, walpb.Snapshot{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,15 +107,15 @@ func testRepair(t *testing.T, ents [][]pb.Entry, corrupt corruptFunc, expectedEn
 
 	// write some more entries to repaired log
 	for i := 1; i <= 10; i++ {
-		es := []pb.Entry{{Index: uint64(expectedEnts + i)}}
-		if err = w.Save(pb.HardState{}, es); err != nil {
+		es := []walpb.Entry{{Index: uint64(expectedEnts + i)}}
+		if err = w.Save(walpb.HardState{}, es); err != nil {
 			t.Fatal(err)
 		}
 	}
 	w.Close()
 
 	// read back entries following repair, ensure it's all there
-	w, err = Open(zap.NewExample(), p, pb.Snapshot{})
+	w, err = Open(zap.NewExample(), p, walpb.Snapshot{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,9 +128,9 @@ func testRepair(t *testing.T, ents [][]pb.Entry, corrupt corruptFunc, expectedEn
 	}
 }
 
-func makeEnts(ents int) (ret [][]pb.Entry) {
+func makeEnts(ents int) (ret [][]walpb.Entry) {
 	for i := 1; i <= ents; i++ {
-		ret = append(ret, []pb.Entry{{Index: uint64(i)}})
+		ret = append(ret, []walpb.Entry{{Index: uint64(i)}})
 	}
 	return ret
 }
@@ -199,7 +199,7 @@ func TestRepairFailDeleteDir(t *testing.T) {
 		SegmentSizeBytes = oldSegmentSizeBytes
 	}()
 	for _, es := range makeEnts(50) {
-		if err = w.Save(pb.HardState{}, es); err != nil {
+		if err = w.Save(walpb.HardState{}, es); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -219,7 +219,7 @@ func TestRepairFailDeleteDir(t *testing.T) {
 	}
 	f.Close()
 
-	w, err = Open(zap.NewExample(), p, pb.Snapshot{})
+	w, err = Open(zap.NewExample(), p, walpb.Snapshot{})
 	if err != nil {
 		t.Fatal(err)
 	}

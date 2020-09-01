@@ -15,11 +15,11 @@
 package log
 
 import (
-	"github.com/BeDreamCoder/wal/pb"
 	"io/ioutil"
 	"os"
 	"testing"
 
+	"github.com/BeDreamCoder/wal/log/walpb"
 	"go.uber.org/zap"
 )
 
@@ -50,7 +50,7 @@ func benchmarkWriteEntry(b *testing.B, size int, batch int) {
 	for i := 0; i < size; i++ {
 		data[i] = byte(i)
 	}
-	e := &pb.Entry{Data: data}
+	e := &walpb.Entry{Data: data}
 
 	b.ResetTimer()
 	n := 0

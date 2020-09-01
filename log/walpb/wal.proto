@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package pb;
+package walpb;
 
-option go_package = "github.com/BeDreamCoder/wal/pb";
+option go_package = "github.com/BeDreamCoder/wal/log/walpb";
 
 message Record {
     int64 type = 1;

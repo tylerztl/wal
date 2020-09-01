@@ -21,7 +21,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/BeDreamCoder/wal/pb"
+	"github.com/BeDreamCoder/wal/log/walpb"
 	"go.etcd.io/etcd/pkg/crc"
 	"go.etcd.io/etcd/pkg/ioutil"
 )
@@ -59,7 +59,7 @@ func newFileEncoder(f *os.File, prevCrc uint32) (*encoder, error) {
 	return newEncoder(f, prevCrc, int(offset)), nil
 }
 
-func (e *encoder) encode(rec *pb.Record) error {
+func (e *encoder) encode(rec *walpb.Record) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 

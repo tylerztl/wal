@@ -13,7 +13,7 @@ import (
 	"testing"
 
 	"github.com/BeDreamCoder/wal/log"
-	"github.com/BeDreamCoder/wal/pb"
+	"github.com/BeDreamCoder/wal/log/walpb"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )
@@ -66,7 +66,7 @@ func TestWAL_SaveRecords(t *testing.T) {
 
 	storage.Close()
 
-	w, err = log.Open(zap.NewExample(), p, pb.Snapshot{})
+	w, err = log.Open(zap.NewExample(), p, walpb.Snapshot{})
 	assert.NoError(t, err)
 
 	storage2 := NewStorage(w)
@@ -81,6 +81,6 @@ func TestWAL_SaveRecords(t *testing.T) {
 		t.Logf("read custom record: %s", rec.Value)
 	}
 
-	err = storage2.Release(pb.Snapshot{Index: 3})
+	err = storage2.Release(walpb.Snapshot{Index: 3})
 	assert.NoError(t, err)
 }
