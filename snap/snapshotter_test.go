@@ -30,6 +30,7 @@ import (
 )
 
 var testSnap = &snappb.ShotData{
+	Index:    1,
 	Data:     []byte("some snapshot"),
 	Metadata: []byte("some metadata"),
 }
@@ -73,7 +74,7 @@ func TestBadCRC(t *testing.T) {
 	// fake a crc mismatch
 	crcTable = crc32.MakeTable(crc32.Koopman)
 
-	_, err = Read(zap.NewExample(), filepath.Join(dir, fmt.Sprintf("%016x-%016x.snap", 1, 1)))
+	_, err = Read(zap.NewExample(), filepath.Join(dir, fmt.Sprintf("%016x.snap", 1)))
 	if err == nil || err != ErrCRCMismatch {
 		t.Errorf("err = %v, want %v", err, ErrCRCMismatch)
 	}
@@ -279,7 +280,7 @@ func TestReleaseSnapDBs(t *testing.T) {
 
 	ss := New(zap.NewExample(), dir)
 
-	if err := ss.ReleaseSnapDBs(snappb.ShotData{Index: 3000}); err != nil {
+	if err := ss.ReleaseSnapDBs(snappb.ShotData{Index: 300}); err != nil {
 		t.Fatal(err)
 	}
 
