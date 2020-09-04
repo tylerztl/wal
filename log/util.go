@@ -20,9 +20,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/BeDreamCoder/wal/log/walpb"
 	"go.etcd.io/etcd/pkg/fileutil"
-	"go.etcd.io/etcd/pkg/pbutil"
 	"go.uber.org/zap"
 )
 
@@ -125,10 +123,4 @@ func closeAll(lg *zap.Logger, rcs ...io.ReadCloser) error {
 		return nil
 	}
 	return errors.New(strings.Join(stringArr, ", "))
-}
-
-func mustUnmarshalEntry(d []byte) walpb.Entry {
-	var e walpb.Entry
-	pbutil.MustUnmarshal(&e, d)
-	return e
 }

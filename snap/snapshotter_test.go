@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/BeDreamCoder/wal/log"
 	"github.com/BeDreamCoder/wal/log/walpb"
 	"github.com/BeDreamCoder/wal/snap/snappb"
 	"go.etcd.io/etcd/pkg/fileutil"
@@ -165,7 +166,7 @@ func TestLoadNewestSnap(t *testing.T) {
 
 	cases := []struct {
 		name              string
-		availableWalSnaps []walpb.Snapshot
+		availableWalSnaps []log.Snapshot
 		expected          *snappb.ShotData
 	}{
 		{
@@ -173,18 +174,18 @@ func TestLoadNewestSnap(t *testing.T) {
 			expected: &newSnap,
 		},
 		{
-			name:              "loadnewestavailable-newest",
-			availableWalSnaps: []walpb.Snapshot{{Index: 0}, {Index: 1}, {Index: 5}},
+			name:              "loadnewestavailablewest",
+			availableWalSnaps: []log.Snapshot{&walpb.Snapshot{Index: 0}, &walpb.Snapshot{Index: 1}, &walpb.Snapshot{Index: 5}},
 			expected:          &newSnap,
 		},
 		{
 			name:              "loadnewestavailable-newest-unsorted",
-			availableWalSnaps: []walpb.Snapshot{{Index: 5}, {Index: 1}, {Index: 0}},
+			availableWalSnaps: []log.Snapshot{&walpb.Snapshot{Index: 5}, &walpb.Snapshot{Index: 1}, &walpb.Snapshot{Index: 0}},
 			expected:          &newSnap,
 		},
 		{
 			name:              "loadnewestavailable-previous",
-			availableWalSnaps: []walpb.Snapshot{{Index: 0}, {Index: 1}},
+			availableWalSnaps: []log.Snapshot{&walpb.Snapshot{Index: 0}, &walpb.Snapshot{Index: 1}},
 			expected:          testSnap,
 		},
 	}

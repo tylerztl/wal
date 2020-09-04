@@ -1,50 +1,86 @@
-# wal
-Write ahead log based on etcd-wal
+# WAL
+Write-Ahead Logging based on etcd-wal
 
 ## Storage API
 ```go
 type Storage interface {
 	// Save function saves ents and state to the underlying stable storage.
 	// Save MUST block until st and ents are on stable storage.
-	Save(st HardState, ents []Entry) error
+	Save(st log.HardState, ents []log.LogEntry) error
+	// SaveState function saves state to the underlying stable storage.
+	SaveState(st log.HardState) error
+	// SaveState function saves ents to the underlying stable storage.
+	SaveEntry(ents []log.LogEntry) error
 	// SaveSnap function saves snapshot to the underlying stable storage.
-	SaveSnap(snap Snapshot) error
-	// SaveRecords function saves custom records to the underlying stable storage.
-	SaveRecords(rt RecordType, crs []CustomRecord) error
+	SaveSnap(snap log.Snapshot) error
 	// Close closes the Storage and performs finalization.
 	Close() error
 	// Release releases the locked wal files older than the provided snapshot.
-	Release(snap Snapshot) error
+	Release(snap log.Snapshot) error
 	// Sync WAL
 	Sync() error
 }
 ```
 
-## Define custom record
-### record example
+## Record Type
 ```go
-type MockRecord struct {
+const (
+	MetadataType RecordType = iota + 1
+	EntryType
+	StateType
+	CrcType
+	SnapshotType
+)
+```
+
+### Record API
+```go
+// LogEntry implement custom entry data struct with entry index
+type LogEntry interface {
+	RecordData
+	// index of the entry saved to the wal
+	GetIndex() uint64
+}
+
+// HardState implement custom state data struct for save the system latest state to wal
+type HardState interface {
+	RecordData
+	// The latest index that has been committed
+	GetCommitted() uint64
+	// Reset set state initial default value
+	Reset()
+}
+
+// Snapshot implement custom snapshot struct with entry index
+type Snapshot interface {
+	RecordData
+	// index of the entry saved to the wal
+	GetIndex() uint64
+}
+
+type RecordData interface {
+	Marshal() (data []byte, err error)
+	Unmarshal(data []byte) error
+}
+```
+
+### Define Custom Record
+```
+type CustomEntry struct {
 	Index uint64
 	Value string
 }
 
-func (m *MockRecord) Marshal() ([]byte, error) {
+func (m *CustomEntry) Marshal() (data []byte, err error) {
 	return json.Marshal(m)
 }
 
-func (m *MockRecord) Unmarshal(data []byte) (interface{}, error) {
-	var e MockRecord
-	err := json.Unmarshal(data, &e)
-	return e, err
+func (m *CustomEntry) Unmarshal(data []byte) error {
+	return json.Unmarshal(data, m)
 }
-func (m *MockRecord) RecordIndex() uint64 {
+func (m *CustomEntry) GetIndex() uint64 {
 	return m.Index
 }
-```
 
-### register custom record
-```go
-const mockType RecordType = 10
-
-RegisterRecord(mockType, &MockRecord{})
+log.RegisterRecord(log.EntryType, log.LogEntry(&CustomEntry{}))
 ```

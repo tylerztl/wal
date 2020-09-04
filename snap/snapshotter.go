@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/BeDreamCoder/wal/log/walpb"
+	"github.com/BeDreamCoder/wal/log"
 	"github.com/BeDreamCoder/wal/snap/snappb"
 	pioutil "go.etcd.io/etcd/pkg/ioutil"
 	"go.etcd.io/etcd/pkg/pbutil"
@@ -107,10 +107,10 @@ func (s *Snapshotter) Load() (*snappb.ShotData, error) {
 }
 
 // LoadNewestAvailable loads the newest snapshot available that is in walSnaps.
-func (s *Snapshotter) LoadNewestAvailable(walSnaps []walpb.Snapshot) (*snappb.ShotData, error) {
+func (s *Snapshotter) LoadNewestAvailable(walSnaps []log.Snapshot) (*snappb.ShotData, error) {
 	return s.loadMatching(func(snapshot *snappb.ShotData) bool {
 		for i := len(walSnaps) - 1; i >= 0; i-- {
-			if snapshot.Index == walSnaps[i].Index {
+			if snapshot.Index == walSnaps[i].GetIndex() {
 				return true
 			}
 		}

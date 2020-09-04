@@ -18,31 +18,27 @@ import (
 	"go.uber.org/zap"
 )
 
-type MockRecord struct {
+type CustomEntry struct {
 	Index uint64
 	Value string
 }
 
-func (m *MockRecord) Marshal() ([]byte, error) {
+func (m *CustomEntry) Marshal() (data []byte, err error) {
 	return json.Marshal(m)
 }
 
-func (m *MockRecord) Unmarshal(data []byte) (interface{}, error) {
-	var e MockRecord
-	err := json.Unmarshal(data, &e)
-	return e, err
+func (m *CustomEntry) Unmarshal(data []byte) error {
+	return json.Unmarshal(data, m)
 }
-func (m *MockRecord) RecordIndex() uint64 {
+func (m *CustomEntry) GetIndex() uint64 {
 	return m.Index
 }
 
-const mockType log.RecordType = 10
-
 func init() {
-	log.RegisterRecord(mockType, &MockRecord{})
+	log.RegisterRecord(log.EntryType, log.LogEntry(&CustomEntry{}))
 }
 
-func TestWAL_SaveRecords(t *testing.T) {
+func TestWAL_SaveEntry(t *testing.T) {
 	p, err := ioutil.TempDir(os.TempDir(), "waltest")
 	assert.NoError(t, err)
 	defer os.RemoveAll(p)
@@ -52,35 +48,33 @@ func TestWAL_SaveRecords(t *testing.T) {
 
 	storage := NewStorage(w)
 
-	records := []log.CustomRecord{
-		&MockRecord{0, "a"},
-		&MockRecord{1, "b"},
-		&MockRecord{2, "c"},
-		&MockRecord{3, "d"},
+	ents := []log.LogEntry{
+		&CustomEntry{1, "a"},
+		&CustomEntry{2, "b"},
+		&CustomEntry{3, "c"},
+		&CustomEntry{4, "d"},
 	}
 
-	for _, v := range records {
-		err = storage.SaveRecords(mockType, []log.CustomRecord{v})
-		assert.NoError(t, err)
-	}
+	err = storage.SaveEntry(ents)
+	assert.NoError(t, err)
 
 	storage.Close()
 
-	w, err = log.Open(zap.NewExample(), p, walpb.Snapshot{})
+	w, err = log.Open(zap.NewExample(), p, &walpb.Snapshot{})
 	assert.NoError(t, err)
 
 	storage2 := NewStorage(w)
 
-	_, _, _, record, err := w.ReadAll()
+	_, _, entrys, err := w.ReadAll()
 	assert.NoError(t, err)
 
 	defer storage2.Close()
 
-	for _, v := range record {
-		rec, _ := v.(MockRecord)
+	for _, v := range entrys {
+		rec, _ := v.(*CustomEntry)
 		t.Logf("read custom record: %s", rec.Value)
 	}
 
-	err = storage2.Release(walpb.Snapshot{Index: 3})
+	err = storage2.Release(&walpb.Snapshot{Index: 3})
 	assert.NoError(t, err)
 }
