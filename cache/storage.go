@@ -64,6 +64,8 @@ type MemoryStorage interface {
 	// into the latest Snapshot; if storage only contains the dummy entry the
 	// first log entry is not available).
 	FirstIndex() (uint64, error)
+	// SetHardState saves the current HardState.
+	SetHardState(st log.HardState) error
 	// ApplySnapshot overwrites the contents of this Storage object with
 	// those of the given snapshot.
 	ApplySnapshot(snap snappb.ShotData, ents []log.LogEntry) error
@@ -102,7 +104,7 @@ func NewMemoryStorage() MemoryStorage {
 	}
 }
 
-// InitialState implements the Storage interface.
+// HardState implements the Storage interface.
 func (ms *memoryStorage) HardState() (log.HardState, error) {
 	return ms.hardState, nil
 }
