@@ -14,6 +14,8 @@ import (
 
 	"github.com/BeDreamCoder/wal/log"
 	"github.com/BeDreamCoder/wal/log/walpb"
+	"github.com/BeDreamCoder/wal/snap"
+	"github.com/BeDreamCoder/wal/snap/snappb"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )
@@ -41,12 +43,18 @@ func init() {
 func TestWAL_SaveEntry(t *testing.T) {
 	p, err := ioutil.TempDir(os.TempDir(), "waltest")
 	assert.NoError(t, err)
-	defer os.RemoveAll(p)
+	s, err := ioutil.TempDir(os.TempDir(), "snaptest")
+	assert.NoError(t, err)
+	defer func() {
+		os.RemoveAll(p)
+		os.RemoveAll(s)
+	}()
 
-	w, err := log.Create(zap.NewExample(), p, []byte("metadata"))
+	lz := zap.NewExample()
+	w, err := log.Create(lz, p, []byte("metadata"))
 	assert.NoError(t, err)
 
-	storage := NewStorage(w)
+	storage := NewStorage(w, snap.New(lz, s))
 
 	ents := []log.LogEntry{
 		&CustomEntry{1, "a"},
@@ -63,7 +71,7 @@ func TestWAL_SaveEntry(t *testing.T) {
 	w, err = log.Open(zap.NewExample(), p, &walpb.Snapshot{})
 	assert.NoError(t, err)
 
-	storage2 := NewStorage(w)
+	storage2 := NewStorage(w, snap.New(lz, s))
 
 	_, _, entrys, err := w.ReadAll()
 	assert.NoError(t, err)
@@ -75,6 +83,6 @@ func TestWAL_SaveEntry(t *testing.T) {
 		t.Logf("read custom record: %s", rec.Value)
 	}
 
-	err = storage2.Release(&walpb.Snapshot{Index: 3})
+	err = storage2.Release(snappb.ShotData{Index: 3}, &walpb.Snapshot{Index: 3})
 	assert.NoError(t, err)
 }

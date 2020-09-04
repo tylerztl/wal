@@ -4,6 +4,8 @@ import (
 	"io"
 
 	"github.com/BeDreamCoder/wal/log"
+	"github.com/BeDreamCoder/wal/snap"
+	"github.com/BeDreamCoder/wal/snap/snappb"
 	"go.uber.org/zap"
 )
 
@@ -16,33 +18,45 @@ type Storage interface {
 	// SaveState function saves ents to the underlying stable storage.
 	SaveEntry(ents []log.LogEntry) error
 	// SaveSnap function saves snapshot to the underlying stable storage.
-	SaveSnap(snap log.Snapshot) error
+	SaveSnap(snap snappb.ShotData, s log.Snapshot) error
 	// Close closes the Storage and performs finalization.
 	Close() error
 	// Release releases the locked wal files older than the provided snapshot.
-	Release(snap log.Snapshot) error
+	Release(snap snappb.ShotData, s log.Snapshot) error
 	// Sync WAL
 	Sync() error
 }
 
 type storage struct {
 	*log.WAL
+	*snap.Snapshotter
 }
 
-func NewStorage(w *log.WAL) Storage {
-	return &storage{w}
+func NewStorage(w *log.WAL, s *snap.Snapshotter) Storage {
+	return &storage{w, s}
 }
 
 // SaveSnap saves the snapshot file to disk and writes the WAL snapshot entry.
-func (st *storage) SaveSnap(snap log.Snapshot) error {
-	return st.WAL.SaveSnapshot(snap)
+func (st *storage) SaveSnap(snap snappb.ShotData, s log.Snapshot) error {
+	// save the snapshot file before writing the snapshot to the wal.
+	// This makes it possible for the snapshot file to become orphaned, but prevents
+	// a WAL snapshot entry from having no corresponding snapshot file.
+	err := st.Snapshotter.SaveSnap(snap)
+	if err != nil {
+		return err
+	}
+
+	return st.WAL.SaveSnapshot(s)
 }
 
 // Release releases resources older than the given snap and are no longer needed:
 // - releases the locks to the wal files that are older than the provided wal for the given snap.
 // - deletes any .snap.db files that are older than the given snap.
-func (st *storage) Release(snap log.Snapshot) error {
-	return st.WAL.ReleaseLockTo(snap.GetIndex())
+func (st *storage) Release(snap snappb.ShotData, s log.Snapshot) error {
+	if err := st.Snapshotter.ReleaseSnapDBs(snap); err != nil {
+		return err
+	}
+	return st.WAL.ReleaseLockTo(s.GetIndex())
 }
 
 // ReadWAL reads the WAL at the given snap and returns the wal, its latest HardState and all entries that appear
