@@ -102,8 +102,8 @@ func (d *decoder) decodeRecord(rec *walpb.Record) error {
 		return err
 	}
 
-	// skip crc checking if the record type is crcType
-	if rec.Type != int64(crcType) {
+	// skip crc checking if the record type is CrcType
+	if rec.Type != int64(CrcType) {
 		d.crc.Write(rec.Data)
 		if err := rec.Validate(d.crc.Sum32()); err != nil {
 			if d.isTornEntry(data) {

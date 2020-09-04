@@ -132,9 +132,3 @@ func mustUnmarshalEntry(d []byte) walpb.Entry {
 	pbutil.MustUnmarshal(&e, d)
 	return e
 }
-
-func mustUnmarshalState(d []byte) walpb.HardState {
-	var s walpb.HardState
-	pbutil.MustUnmarshal(&s, d)
-	return s
-}

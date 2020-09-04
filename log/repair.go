@@ -48,7 +48,7 @@ func Repair(lg *zap.Logger, dirpath string) bool {
 		case nil:
 			// update crc of the decoder when necessary
 			switch rec.Type {
-			case int64(crcType):
+			case int64(CrcType):
 				crc := decoder.crc.Sum32()
 				// current crc of decoder must match the crc of the record.
 				// do no need to match 0 crc, since the decoder is a new one at this case.
