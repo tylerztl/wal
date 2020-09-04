@@ -9,6 +9,7 @@ package wal
 import (
 	"encoding/json"
 	"io/ioutil"
+	math_bits "math/bits"
 	"os"
 	"testing"
 
@@ -32,8 +33,29 @@ func (m *CustomEntry) Marshal() (data []byte, err error) {
 func (m *CustomEntry) Unmarshal(data []byte) error {
 	return json.Unmarshal(data, m)
 }
+
 func (m *CustomEntry) GetIndex() uint64 {
 	return m.Index
+}
+
+func (m *CustomEntry) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.Index != 0 {
+		n += 1 + sovWal(uint64(m.Index))
+	}
+	l = len(m.Value)
+	if l > 0 {
+		n += 1 + l + sovWal(uint64(l))
+	}
+	return n
+}
+
+func sovWal(x uint64) (n int) {
+	return (math_bits.Len64(x|1) + 6) / 7
 }
 
 func init() {

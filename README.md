@@ -40,6 +40,8 @@ type LogEntry interface {
 	RecordData
 	// index of the entry saved to the wal
 	GetIndex() uint64
+	// size of entry alloc memory
+	Size() (n int)
 }
 
 // HardState implement custom state data struct for save the system latest state to wal
@@ -65,7 +67,7 @@ type RecordData interface {
 ```
 
 ### Define Custom Record
-```
+```go
 type CustomEntry struct {
 	Index uint64
 	Value string
