@@ -42,10 +42,22 @@ var (
 	crcTable         = crc32.MakeTable(crc32.Castagnoli)
 
 	// A map of valid files that can be present in the snap folder.
-	validFiles = map[string]bool{
-		"db": true,
-	}
+	validFiles = map[string]bool{"db": true}
 )
+
+type SnapshotAPI interface {
+	// Load returns the newest snapshot.
+	Load() (*snappb.ShotData, error)
+	// LoadNewestAvailable loads the newest snapshot available that is in walSnaps.
+	LoadNewestAvailable(walSnaps []log.Snapshot) (*snappb.ShotData, error)
+	SaveSnapData(snapshot snappb.ShotData) error
+	ReleaseSnapDBs(snap snappb.ShotData) error
+	// SnapNames returns the filename of the snapshots in logical time order (from newest to oldest).
+	// If there is no available snapshots, an ErrNoSnapshot will be returned.
+	SnapNames() ([]string, error)
+}
+
+var _ SnapshotAPI = &Snapshotter{}
 
 type Snapshotter struct {
 	lg  *zap.Logger
@@ -62,7 +74,7 @@ func New(lg *zap.Logger, dir string) *Snapshotter {
 	}
 }
 
-func (s *Snapshotter) SaveSnap(snapshot snappb.ShotData) error {
+func (s *Snapshotter) SaveSnapData(snapshot snappb.ShotData) error {
 	if snapshot.Index == 0 {
 		return nil
 	}
@@ -120,7 +132,7 @@ func (s *Snapshotter) LoadNewestAvailable(walSnaps []log.Snapshot) (*snappb.Shot
 
 // loadMatching returns the newest snapshot where matchFn returns true.
 func (s *Snapshotter) loadMatching(matchFn func(*snappb.ShotData) bool) (*snappb.ShotData, error) {
-	names, err := s.snapNames()
+	names, err := s.SnapNames()
 	if err != nil {
 		return nil, err
 	}
@@ -208,9 +220,9 @@ func Read(lg *zap.Logger, snapname string) (*snappb.ShotData, error) {
 	return &snap, nil
 }
 
-// snapNames returns the filename of the snapshots in logical time order (from newest to oldest).
+// SnapNames returns the filename of the snapshots in logical time order (from newest to oldest).
 // If there is no available snapshots, an ErrNoSnapshot will be returned.
-func (s *Snapshotter) snapNames() ([]string, error) {
+func (s *Snapshotter) SnapNames() ([]string, error) {
 	dir, err := os.Open(s.dir)
 	if err != nil {
 		return nil, err

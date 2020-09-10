@@ -30,7 +30,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var testSnap = &snappb.ShotData{
+var testSnap = snappb.ShotData{
 	Index:    1,
 	Data:     []byte("some snapshot"),
 	Metadata: []byte("some metadata"),
@@ -44,7 +44,7 @@ func TestSaveAndLoad(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 	ss := New(zap.NewExample(), dir)
-	err = ss.save(testSnap)
+	err = ss.SaveSnapData(testSnap)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,8 +53,8 @@ func TestSaveAndLoad(t *testing.T) {
 	if err != nil {
 		t.Errorf("err = %v, want nil", err)
 	}
-	if !reflect.DeepEqual(g, testSnap) {
-		t.Errorf("snap = %#v, want %#v", g, testSnap)
+	if !reflect.DeepEqual(*g, testSnap) {
+		t.Errorf("snap = %#v, want %#v", *g, testSnap)
 	}
 }
 
@@ -66,7 +66,7 @@ func TestBadCRC(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 	ss := New(zap.NewExample(), dir)
-	err = ss.save(testSnap)
+	err = ss.SaveSnapData(testSnap)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +96,7 @@ func TestFailback(t *testing.T) {
 	}
 
 	ss := New(zap.NewExample(), dir)
-	err = ss.save(testSnap)
+	err = ss.SaveSnapData(testSnap)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,8 +105,8 @@ func TestFailback(t *testing.T) {
 	if err != nil {
 		t.Errorf("err = %v, want nil", err)
 	}
-	if !reflect.DeepEqual(g, testSnap) {
-		t.Errorf("snap = %#v, want %#v", g, testSnap)
+	if !reflect.DeepEqual(*g, testSnap) {
+		t.Errorf("snap = %#v, want %#v", *g, testSnap)
 	}
 	if f, err := os.Open(filepath.Join(dir, large) + ".broken"); err != nil {
 		t.Fatal("broken snapshot does not exist")
@@ -131,7 +131,7 @@ func TestSnapNames(t *testing.T) {
 		}
 	}
 	ss := New(zap.NewExample(), dir)
-	names, err := ss.snapNames()
+	names, err := ss.SnapNames()
 	if err != nil {
 		t.Errorf("err = %v, want nil", err)
 	}
@@ -152,14 +152,14 @@ func TestLoadNewestSnap(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 	ss := New(zap.NewExample(), dir)
-	err = ss.save(testSnap)
+	err = ss.SaveSnapData(testSnap)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	newSnap := *testSnap
+	newSnap := testSnap
 	newSnap.Index = 5
-	err = ss.save(&newSnap)
+	err = ss.SaveSnapData(newSnap)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,21 +167,21 @@ func TestLoadNewestSnap(t *testing.T) {
 	cases := []struct {
 		name              string
 		availableWalSnaps []log.Snapshot
-		expected          *snappb.ShotData
+		expected          snappb.ShotData
 	}{
 		{
 			name:     "load-newest",
-			expected: &newSnap,
+			expected: newSnap,
 		},
 		{
 			name:              "loadnewestavailablewest",
 			availableWalSnaps: []log.Snapshot{&walpb.Snapshot{Index: 0}, &walpb.Snapshot{Index: 1}, &walpb.Snapshot{Index: 5}},
-			expected:          &newSnap,
+			expected:          newSnap,
 		},
 		{
 			name:              "loadnewestavailable-newest-unsorted",
 			availableWalSnaps: []log.Snapshot{&walpb.Snapshot{Index: 5}, &walpb.Snapshot{Index: 1}, &walpb.Snapshot{Index: 0}},
-			expected:          &newSnap,
+			expected:          newSnap,
 		},
 		{
 			name:              "loadnewestavailable-previous",
@@ -201,8 +201,8 @@ func TestLoadNewestSnap(t *testing.T) {
 			if err != nil {
 				t.Errorf("err = %v, want nil", err)
 			}
-			if !reflect.DeepEqual(g, tc.expected) {
-				t.Errorf("snap = %#v, want %#v", g, tc.expected)
+			if !reflect.DeepEqual(*g, tc.expected) {
+				t.Errorf("snap = %#v, want %#v", *g, tc.expected)
 			}
 		})
 	}
@@ -241,7 +241,7 @@ func TestEmptySnapshot(t *testing.T) {
 	}
 }
 
-// TestAllSnapshotBroken ensures snapshotter returns
+// TestAllSnapshotBroken ensures Snapshotter returns
 // ErrNoSnapshot if all the snapshots are broken.
 func TestAllSnapshotBroken(t *testing.T) {
 	dir := filepath.Join(os.TempDir(), "snapshot")

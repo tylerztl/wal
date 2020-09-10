@@ -54,6 +54,31 @@ var (
 	SegmentSizeBytes int64 = 64 * 1000 * 1000 // 64MB
 )
 
+var _ WALAPI = &WAL{}
+
+type WALAPI interface {
+	// Save function saves ents and state to the underlying stable storage.
+	// Save MUST block until st and ents are on stable storage.
+	Save(st HardState, ents []LogEntry) error
+	// SaveState function saves state to the underlying stable storage.
+	SaveState(st HardState) error
+	// SaveState function saves ents to the underlying stable storage.
+	SaveEntry(ents []LogEntry) error
+	// SaveSnapshot function saves snapshot to the underlying stable storage.
+	SaveSnapshot(e Snapshot) error
+	// ReleaseLockTo releases the locks, which has smaller index than the given index
+	// except the largest one among them.
+	ReleaseLockTo(index uint64) error
+	// ReadAll reads out records of the current WAL.
+	ReadAll() (metadata []byte, state HardState, ents []LogEntry, err error)
+	// Sync WAL
+	Sync() error
+
+	SetUnsafeNoFsync()
+	// Close closes the Storage and performs finalization.
+	Close() error
+}
+
 // WAL is a logical representation of the stable storage.
 // WAL is either in read mode or append mode but not both.
 // A newly created WAL is in append mode, and ready for appending records.
